@@ -46,7 +46,15 @@ const AppObjectStore = {
 
 	getAppState: function() {
 
-		if (this.appState === null) this.appState = new AppState();
+		if (this.appState === null) { 
+
+			this.appState = new AppState();
+
+			this.appStateUI = new AppStateUI();
+
+			this.appState.setUI(this.appStateUI);
+
+		}
 
 		return this.appState;
 
@@ -97,8 +105,6 @@ class AppManager {
 
 		this.adapter = new AppAdapter(this);
 
-		this.requestFormatter = new AppStateRequestFormatter(state);
-
 	}
 
 	start() {
@@ -119,9 +125,11 @@ class AppManager {
 
 		this.state.setProblems(problems);
 
+		this.state.addParticipant(this.state.getUser());
+
 		this.adapter.sendCreateContest(
 
-			this.requestFormatter.getCreateContestRequest(),
+			AppStateRequestConvertor.getCreateContestRequest(this.state),
 
 			() => {
 
@@ -136,7 +144,13 @@ class AppManager {
 
 		this.adapter.sendJoinContest(
 
-			this.requestFormatter.getJoinContestRequest(inviteCode),
+			AppStateRequestConvertor.getJoinContestRequest(this.state, inviteCode),
+
+			(contestResponse) => {
+
+				this.state.update(AppStateResponseConvertor.processJoinContestResponse(contestResponse));
+
+			},
 
 			() => {
 
@@ -342,7 +356,26 @@ class AppState {
 
 		this.participants = {};
 
-		this.appStateUI = new AppStateUI(this);
+
+	}
+
+	setUI(appStateUI) {
+
+		this.appStateUI = appStateUI;
+
+		this.appStateUI.setState(this);
+
+	}
+
+	update(appStateObj) {
+
+		this.duration = appStateObj.getDuration();
+
+		this.participants = appStateObj.getParticipants();
+
+		this.problems = appStateObj.getProblems();
+
+		this._updateUI();
 
 	}
 
@@ -368,11 +401,17 @@ class AppState {
 
 	}
 
+	getDuration() {
+
+		return this.duration;
+
+	}
+
 	setProblems(problems) {
 
-		this.problems = structuredClone(problems);
+		console.log(problems);
 
-		this.addParticipant(this.user);
+		this.problems = structuredClone(problems);
 
 		this._updateUI();
 
@@ -408,31 +447,26 @@ class AppState {
 
 	_updateUI() {
 
-		this.appStateUI.render();
+		if (this.appStateUI) this.appStateUI.render();
 
 	}
 
 }
 
-class AppStateRequestFormatter {
 
-	constructor(state) {
+const AppStateRequestConvertor = {
 
-		this.state = state;
-
-	}
-
-	getCreateContestRequest() {
+	getCreateContestRequest(state) {
 
 		return {
 
-			userId: this.state.getUser(),
+			userId: state.getUser(),
 
-			questions: this.state.getProblems().map((problem) => { return this._formatQuestion(problem); }),
+			questions: state.getProblems().map((problem) => { return this._formatQuestion(problem); }),
 
 		};
 
-	}
+	},
 
 	_formatQuestion(problem) {
 
@@ -444,18 +478,34 @@ class AppStateRequestFormatter {
 
 		}
 
-	}
+	},
 
-	getJoinContestRequest(inviteCode) {
+	getJoinContestRequest(state, inviteCode) {
 
 		return {
 
 			sessionId: inviteCode,
 			
-			userId: this.state.getUser()
+			userId: state.getUser()
 
 		};
 
+	}
+
+}
+
+const AppStateResponseConvertor = {
+
+	processJoinContestResponse: function(response) {
+
+		let newState = new AppState();
+
+		newState.setProblems(response.questions.map((problem) => problem.url));
+
+		response.users.forEach((user) => { newState.addParticipant(user.userId); })
+
+		return newState;
+		
 	}
 
 }
@@ -469,9 +519,9 @@ class AppStateUI {
 
 	};
 
-	constructor(appState) {
+	setState(state) {
 
-		this.appState = appState;
+		this.appState = state;
 
 	}
 
@@ -564,9 +614,11 @@ class AppAdapter {
 
 	}
 
-	sendJoinContest(joinRequest, onJoinSuccess) {
+	sendJoinContest(joinRequest, stateUpdateCallback, onJoinSuccess) {
 
-		this.adapterAjax.sendJoinContestRequest(joinRequest, (contestResponse) => {
+		this.adapterAjax.sendJoinContestRequest(joinRequest,(contestResponse) => {
+
+			stateUpdateCallback(contestResponse);
 
 			this.adapterSocket.init(
 
