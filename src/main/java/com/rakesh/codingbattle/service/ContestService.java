@@ -40,7 +40,7 @@ public class ContestService {
 
         List<ContestQuestions> contestQuestionsToSave = new ArrayList<>();
 
-        for(var questionDTO: createContestRequest.getQuestionDTOS()) {
+        for(var questionDTO: createContestRequest.getQuestions()) {
 
             ContestQuestions contestQuestions = new ContestQuestions();
             contestQuestions.setContestId(contestSavedId);
@@ -58,7 +58,7 @@ public class ContestService {
         contestUsersRepository.save(contestUsers);
 
         Contest contestResponse = new Contest();
-        contestResponse.setQuestions(createContestRequest.getQuestionDTOS());
+        contestResponse.setQuestions(createContestRequest.getQuestions());
         contestResponse.setSessionId(String.valueOf(contestSavedId));
         contestResponse.setUsers(List.of(new UserDTO(createContestRequest.getUserId())));
 

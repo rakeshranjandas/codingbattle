@@ -12,7 +12,7 @@ import java.util.List;
 @NoArgsConstructor
 public class CreateContestRequest {
 
-    private List<QuestionDTO> questionDTOS;
+    private List<QuestionDTO> questions;
 
     private String userId;
 
