@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coding Battle Testing</title>
+
+    <link rel="stylesheet" href="styles.css">
+
+</head>
+<body>
+
+<div class="container">
+
+    <div id="state_div">
+    </div>
+
+    <div id="app">
+
+        <div id="input_user_div">
+            <input type="text" id="input_user_text" placeholder="Enter Leetcode User">
+            <button type="button" onclick="AppActions.saveUser()">Submit</button>
+        </div>
+
+        <div id="create_or_join_div">
+
+            <div id="create_div">
+                <h3>Create Contest</h3>
+                <input type="text" id="create_duration_text" placeholder="Duration(in minutes)"><br><br>
+                <textarea id="create_problems_textarea" rows="15" cols="40" placeholder="Enter Problems"></textarea>
+                <br>
+                <button onclick="AppActions.createContest()">Create</button>
+            </div>
+
+            <hr>
+
+            <div id="join_div">
+                <h3>Join Contest</h3>
+                <input type="text" id="join_code_text" placeholder="Invite Code">
+                <button onclick="AppActions.joinContest()">Join</button>
+            </div>
+
+        </div>
+
+        <div id="connecting_div">
+            <h3>Connecting</h3>
+        </div>
+
+        <div id="ready_div">
+            <h3>Ready</h3>
+        </div>
+
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@7.0.0/bundles/stomp.umd.min.js"></script>
+    <script src="script.js"></script>
+
+</div>
+
+</body>
+</html>
