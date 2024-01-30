@@ -38,7 +38,10 @@ public class ContestController {
     @MessageMapping("/contest/{id}")
     @SendTo("/cb-topic/{id}")
     public String handleMessage(@DestinationVariable String id, String message) {
-        return "Success";
+
+        System.out.println("Destination: " + id + ", message: " + message);
+
+        return "Success: message " + message;
     }
 
 }

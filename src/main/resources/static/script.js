@@ -97,6 +97,8 @@ class AppManager {
 
 		this.adapter = new AppAdapter(this);
 
+		this.requestFormatter = new AppStateRequestFormatter(state);
+
 	}
 
 	start() {
@@ -119,8 +121,7 @@ class AppManager {
 
 		this.adapter.sendCreateContest(
 
-			this.state.serialize(),
-
+			this.requestFormatter.getCreateContestRequest(),
 
 			() => {
 
@@ -135,10 +136,7 @@ class AppManager {
 
 		this.adapter.sendJoinContest(
 
-			this.state.getUser(),
-
-			inviteCode,
-
+			this.requestFormatter.getJoinContestRequest(inviteCode),
 
 			() => {
 
@@ -348,20 +346,6 @@ class AppState {
 
 	}
 
-	serialize() {
-
-		return {
-
-			user: this.user,
-
-			problems: this.problems,
-
-			participants: this.participants
-
-		}
-
-	}
-
 	setUser(user) {
 
 		this.user = user;
@@ -425,6 +409,52 @@ class AppState {
 	_updateUI() {
 
 		this.appStateUI.render();
+
+	}
+
+}
+
+class AppStateRequestFormatter {
+
+	constructor(state) {
+
+		this.state = state;
+
+	}
+
+	getCreateContestRequest() {
+
+		return {
+
+			userId: this.state.getUser(),
+
+			questions: this.state.getProblems().map((problem) => { return this._formatQuestion(problem); }),
+
+		};
+
+	}
+
+	_formatQuestion(problem) {
+
+		return {
+			
+			name: "temp_problem_name",
+
+			url: problem
+
+		}
+
+	}
+
+	getJoinContestRequest(inviteCode) {
+
+		return {
+
+			sessionId: inviteCode,
+			
+			userId: this.state.getUser()
+
+		};
 
 	}
 
@@ -510,30 +540,51 @@ class AppAdapter {
 
 	}
 
-	sendCreateContest(contest, onCreateSuccess) {
+	sendCreateContest(contestRequest, onCreateSuccess) {
 
-		let contestTopic = 123; // Do Ajax call and create a contest -> Retrieve contest id
+		this.adapterAjax.sendCreateContestRequest(contestRequest, (contestResponse) => {
 
-		this.adapterSocket.init(contestTopic, this.processReceivedMessage, onCreateSuccess);
+			this.adapterSocket.init(
+
+				contestResponse.sessionId, 
+
+				this.processReceivedMessage, 
+
+				() => {
+
+					onCreateSuccess();
+
+					this.adapterSocket.send({"message": "Create contest test."});
+
+				}
+
+			);
+
+		});
 
 	}
 
-	sendJoinContest(user, inviteCode, onJoinSuccess) {
+	sendJoinContest(joinRequest, onJoinSuccess) {
 
-		this.adapterSocket.init(
+		this.adapterAjax.sendJoinContestRequest(joinRequest, (contestResponse) => {
 
-			'xx',
+			this.adapterSocket.init(
 
-			this.processReceivedMessage,
+				contestResponse.sessionId, 
 
-			() => {
+				this.processReceivedMessage, 
 
-				onJoinSuccess();
+				() => {
 
-				this.adapterSocket.send({name: user});
+					onJoinSuccess();
 
-			}
-		);
+					this.adapterSocket.send({"message": "Join contest test."});
+
+				}
+
+			);
+
+		});
 
 	}
 
@@ -564,16 +615,61 @@ class AppAdapter {
 
 class AppAdapterAjax {
 
+	_PATH_PREFIX = 'v1/contest';
+
+	_PATHS = {
+
+		CREATE_CONTEST: '',
+
+		JOIN_CONTEST: 'join'
+
+	}
+
+	sendCreateContestRequest(contestRequest, callback) {
+
+		this._doPostRequest(this._PATHS.CREATE_CONTEST, contestRequest, callback);
+
+	}
+
+	sendJoinContestRequest(joinRequest, callback) {
+
+		this._doPostRequest(this._PATHS.JOIN_CONTEST, joinRequest, callback);
+
+	}
+
+	_doPostRequest(path, request, callback) {
+
+		$.ajax({
+
+			type: 'POST',
+			
+			url: this._PATH_PREFIX + (path.length ? '/' + path: ''),
+			
+			data: JSON.stringify(request),
+
+			contentType: "application/json",
+			
+			dataType: 'json',
+			
+			success: function(res){
+			
+				callback(res);
+			
+			}
+
+		});
+
+	}
 
 }
 
 class AppAdapterSocket {
 
-	BROKER_URL = 'ws://localhost:8111/gs-guide-websocket';
+	BROKER_URL = 'ws://localhost:8100/coding-battle-websocket';
 
-	PUBLISH_DESTINATION = "/app/hello";
+	PUBLISH_DESTINATION = "/cb-publish/contest";
 
-	SUBSCRIBE_ENDPOINT = '/topic/greetings';
+	SUBSCRIBE_ENDPOINT = '/cb-topic';
 
 	constructor() {
 
@@ -581,7 +677,15 @@ class AppAdapterSocket {
 
 	}
 
+	setRoom(room) {
+
+		this.room = room;
+
+	}
+
 	init(topic, processReceivedCallback, onInitSuccessCallback) {
+
+		this.setRoom(topic);
 
 		this.stompClient.onConnect = (frame) => {
 
@@ -589,9 +693,11 @@ class AppAdapterSocket {
 
 		    onInitSuccessCallback();
 
-		    this.stompClient.subscribe(this.SUBSCRIBE_ENDPOINT, (greeting) => {
+		    this.stompClient.subscribe(this.SUBSCRIBE_ENDPOINT + '/' + this.room, (socketMessage) => {
 
-		    	processReceivedCallback(JSON.parse(greeting.body));
+		    	console.log(socketMessage.body);
+
+		    	// processReceivedCallback(JSON.parse(greeting.body));
 
 		    });
 
@@ -615,7 +721,7 @@ class AppAdapterSocket {
 
 	    this.stompClient.publish({
 
-	        destination: this.PUBLISH_DESTINATION,
+	        destination: this.PUBLISH_DESTINATION + '/' + this.room,
 
 	        body: JSON.stringify(data)
 
