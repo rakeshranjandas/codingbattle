@@ -3,6 +3,8 @@ package com.rakesh.codingbattle.controller;
 import com.rakesh.codingbattle.controller.request.CreateContestRequest;
 import com.rakesh.codingbattle.controller.request.JoinContestRequest;
 import com.rakesh.codingbattle.controller.response.Contest;
+import com.rakesh.codingbattle.controller.response.JoinResponse;
+import com.rakesh.codingbattle.model.Event;
 import com.rakesh.codingbattle.service.ContestService;
 import lombok.AllArgsConstructor;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
@@ -37,11 +39,8 @@ public class ContestController {
 
     @MessageMapping("/contest/{id}")
     @SendTo("/cb-topic/{id}")
-    public String handleMessage(@DestinationVariable String id, String message) {
-
-        System.out.println("Destination: " + id + ", message: " + message);
-
-        return "Success: message " + message;
+    public JoinResponse handleJoinMessage(@DestinationVariable String id, Event event) {
+        return new JoinResponse(event.getUserId());
     }
-
+    
 }
