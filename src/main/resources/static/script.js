@@ -103,7 +103,7 @@ class AppManager {
 
 		this.state = state;
 
-		this.adapter = new AppAdapter(this);
+		this.adapter = new AppAdapter();
 
 	}
 
@@ -116,6 +116,8 @@ class AppManager {
 	saveUser(user) {
 
 		this.state.setUser(user);
+
+		this.adapter.setUser(user);
 
 	}
 
@@ -409,8 +411,6 @@ class AppState {
 
 	setProblems(problems) {
 
-		console.log(problems);
-
 		this.problems = structuredClone(problems);
 
 		this._updateUI();
@@ -580,9 +580,7 @@ class AppStateUI {
 
 class AppAdapter {
 
-	constructor(manager) {
-
-		this.manager = manager;
+	constructor() {
 
 		this.adapterAjax = new AppAdapterAjax();
 
@@ -590,53 +588,64 @@ class AppAdapter {
 
 	}
 
+	setUser(user) {
+
+		this.adapterAjax.setUser(user);
+
+		this.adapterSocket.setUser(user);
+
+	}
+
 	sendCreateContest(contestRequest, onCreateSuccess) {
 
-		this.adapterAjax.sendCreateContestRequest(contestRequest, (contestResponse) => {
+		this.adapterAjax.sendCreateContestRequest(
 
-			this.adapterSocket.init(
+			contestRequest, 
 
-				contestResponse.sessionId, 
+			(contestResponse) => {
 
-				this.processReceivedMessage, 
+				this.adapterSocket.init(
 
-				() => {
+					contestResponse.sessionId, 
 
-					onCreateSuccess();
+					this.processReceivedMessage, 
 
-					this.adapterSocket.send({"message": "Create contest test."});
+					() => { onCreateSuccess(); }
 
-				}
-
-			);
-
-		});
+				);
+			}
+		);
 
 	}
 
 	sendJoinContest(joinRequest, stateUpdateCallback, onJoinSuccess) {
 
-		this.adapterAjax.sendJoinContestRequest(joinRequest,(contestResponse) => {
+		this.adapterAjax.sendJoinContestRequest(
 
-			stateUpdateCallback(contestResponse);
+			joinRequest,
 
-			this.adapterSocket.init(
+			(contestResponse) => {
 
-				contestResponse.sessionId, 
+				stateUpdateCallback(contestResponse);
 
-				this.processReceivedMessage, 
+				this.adapterSocket.init(
 
-				() => {
+					contestResponse.sessionId, 
 
-					onJoinSuccess();
+					this.processReceivedMessage, 
 
-					this.adapterSocket.send({"message": "Join contest test."});
+					() => {
 
-				}
+						onJoinSuccess();
 
-			);
+						this.adapterSocket.sendJoinContestMessage();
 
-		});
+					}
+
+				);
+			}
+
+		);
 
 	}
 
@@ -674,6 +683,12 @@ class AppAdapterAjax {
 		CREATE_CONTEST: '',
 
 		JOIN_CONTEST: 'join'
+
+	}
+
+	setUser(user) {
+
+		this.user = user;
 
 	}
 
@@ -723,6 +738,16 @@ class AppAdapterSocket {
 
 	SUBSCRIBE_ENDPOINT = '/cb-topic';
 
+	EVENT = {
+
+		JOIN: 'JOIN',
+
+		SUBMIT_AC: 'SUBMIT_AC',
+
+		CONTEST_END: 'CONTEST_END'
+
+	};
+
 	constructor() {
 
 		this.stompClient = new StompJs.Client({ brokerURL: this.BROKER_URL });
@@ -733,6 +758,12 @@ class AppAdapterSocket {
 
 		this.room = room;
 
+	}
+
+	setUser(user) {
+
+		this.user = user;
+		
 	}
 
 	init(topic, processReceivedCallback, onInitSuccessCallback) {
@@ -766,6 +797,18 @@ class AppAdapterSocket {
 
 
 		this.stompClient.activate();
+
+	}
+
+	sendJoinContestMessage() {
+
+		this.send({
+
+			eventType: this.EVENT.JOIN,
+
+			userId: this.user
+
+		});
 
 	}
 
