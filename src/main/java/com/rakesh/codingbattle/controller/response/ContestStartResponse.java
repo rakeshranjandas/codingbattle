@@ -4,10 +4,10 @@ import com.rakesh.codingbattle.enums.EventType;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
-@AllArgsConstructor
 @Data
-public class JoinResponse {
-    private String userId;
+@AllArgsConstructor
+public class ContestStartResponse {
     private EventType eventType;
-
+    private long createdAt;
+    private String startedBy;
 }

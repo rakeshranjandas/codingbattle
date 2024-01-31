@@ -13,7 +13,6 @@ import java.util.List;
 public class CreateContestRequest {
 
     private List<QuestionDTO> questions;
-
     private String userId;
 
 }

@@ -3,6 +3,7 @@ package com.rakesh.codingbattle.controller;
 import com.rakesh.codingbattle.controller.request.CreateContestRequest;
 import com.rakesh.codingbattle.controller.request.JoinContestRequest;
 import com.rakesh.codingbattle.controller.response.Contest;
+import com.rakesh.codingbattle.controller.response.ContestStartResponse;
 import com.rakesh.codingbattle.controller.response.JoinResponse;
 import com.rakesh.codingbattle.model.Event;
 import com.rakesh.codingbattle.service.ContestService;
@@ -14,6 +15,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.time.Instant;
 
 @AllArgsConstructor
 @RestController
@@ -40,7 +43,14 @@ public class ContestController {
     @MessageMapping("/contest/{id}")
     @SendTo("/cb-topic/{id}")
     public JoinResponse handleJoinMessage(@DestinationVariable String id, Event event) {
-        return new JoinResponse(event.getUserId());
+        return new JoinResponse(event.getUserId(), event.getEventType());
     }
-    
+
+    @MessageMapping("/contest/{id}/start")
+    @SendTo("/cb-topic/{id}")
+    public ContestStartResponse handleStartMessage(@DestinationVariable String id, Event event) {
+        contestService.handleStartMessage(id, event.getUserId());
+        return new ContestStartResponse(event.getEventType(), Instant.now().toEpochMilli(), event.getUserId());
+    }
+
 }
