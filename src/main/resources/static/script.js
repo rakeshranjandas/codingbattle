@@ -99,11 +99,13 @@ class AppManager {
 
 		this.view = view;
 
-		view.setManager(this);
+		this.view.setManager(this);
 
 		this.state = state;
 
 		this.adapter = new AppAdapter();
+
+		this.adapter.setManager(this);
 
 	}
 
@@ -129,36 +131,39 @@ class AppManager {
 
 		this.state.addParticipant(this.state.getUser());
 
-		this.adapter.sendCreateContest(
+		if (onCreateSuccess) this.createdContestCallback = () => { onCreateSuccess(); };
 
-			AppStateRequestConvertor.getCreateContestRequest(this.state),
+		this.adapter.sendCreateContest(this.state.clone());
 
-			() => {
+	}
 
-				onCreateSuccess();
+	createdContest(contestId) {
 
-			}
-		);
+		console.log('Created contest', contestId);
+
+		if (this.createdContestCallback) this.createdContestCallback();
 
 	}
 
 	joinContest(inviteCode, onJoinSuccess) {
 
+		if (onJoinSuccess) this.joinedContestCallback = () => { onJoinSuccess(); };
+
 		this.adapter.sendJoinContest(
 
-			AppStateRequestConvertor.getJoinContestRequest(this.state, inviteCode),
+			this.state.clone(),
 
-			(contestResponse) => {
+			inviteCode
 
-				this.state.update(AppStateResponseConvertor.processJoinContestResponse(contestResponse));
-
-			},
-
-			() => {
-
-				onJoinSuccess();
-			}
 		);
+	}
+
+	joinedContest(newState) {
+
+		this.state.update(newState);
+
+		if (this.joinedContestCallback) this.joinedContestCallback();
+
 	}
 
 }
@@ -361,6 +366,22 @@ class AppState {
 
 	}
 
+	clone() {
+
+		let cloned = new AppState();
+
+		cloned.setUser(this.user);
+
+		cloned.setDuration(this.duration);
+
+		cloned.setProblems(this.problems);
+
+		cloned.setParticipants(this.participants);
+
+		return cloned;
+
+	}
+
 	setUI(appStateUI) {
 
 		this.appStateUI = appStateUI;
@@ -428,6 +449,12 @@ class AppState {
 		this.participants[user] = Array(this.problems.length).fill('');
 
 		this._updateUI();
+
+	}
+
+	setParticipants(participants) {
+
+		this.participants = structuredClone(participants);
 
 	}
 
@@ -506,6 +533,12 @@ const AppStateResponseConvertor = {
 
 		return newState;
 		
+	},
+
+	getContestId: function(contestResponse) {
+
+		return contestResponse.sessionId;
+
 	}
 
 }
@@ -584,7 +617,18 @@ class AppAdapter {
 
 		this.adapterAjax = new AppAdapterAjax();
 
+		this.adapterAjax.setAdapter(this);
+
 		this.adapterSocket = new AppAdapterSocket();
+
+		this.adapterSocket.setAdapter(this);
+
+
+	}
+
+	setManager(manager) {
+
+		this.manager = manager;
 
 	}
 
@@ -596,7 +640,11 @@ class AppAdapter {
 
 	}
 
-	sendCreateContest(contestRequest, onCreateSuccess) {
+	sendCreateContest(state) {
+
+		let contestRequest = AppStateRequestConvertor.getCreateContestRequest(state);
+
+		console.log(contestRequest);
 
 		this.adapterAjax.sendCreateContestRequest(
 
@@ -606,11 +654,9 @@ class AppAdapter {
 
 				this.adapterSocket.init(
 
-					contestResponse.sessionId, 
+					contestResponse.sessionId,
 
-					this.processReceivedMessage, 
-
-					() => { onCreateSuccess(); }
+					() => { this.manager.createdContest(AppStateResponseConvertor.getContestId(contestResponse)); }
 
 				);
 			}
@@ -618,7 +664,9 @@ class AppAdapter {
 
 	}
 
-	sendJoinContest(joinRequest, stateUpdateCallback, onJoinSuccess) {
+	sendJoinContest(state, inviteCode) {
+
+		let joinRequest = AppStateRequestConvertor.getJoinContestRequest(state, inviteCode);
 
 		this.adapterAjax.sendJoinContestRequest(
 
@@ -626,17 +674,13 @@ class AppAdapter {
 
 			(contestResponse) => {
 
-				stateUpdateCallback(contestResponse);
-
 				this.adapterSocket.init(
 
-					contestResponse.sessionId, 
-
-					this.processReceivedMessage, 
+					contestResponse.sessionId,
 
 					() => {
 
-						onJoinSuccess();
+						this.manager.joinedContest(AppStateResponseConvertor.processJoinContestResponse(contestResponse));
 
 						this.adapterSocket.sendJoinContestMessage();
 
@@ -649,9 +693,11 @@ class AppAdapter {
 
 	}
 
-	processReceivedMessage(receivedMessage) {
+	processReceivedSocketMessage(receivedMessage) {
 
-		console.log(receivedMessage)
+		// this.manager.responseProcessor(receivedMessage);
+
+		console.log(receivedMessage);
 
 	}
 
@@ -689,6 +735,12 @@ class AppAdapterAjax {
 	setUser(user) {
 
 		this.user = user;
+
+	}
+
+	setAdapter(adapter) {
+
+		this.adapter = adapter;
 
 	}
 
@@ -766,7 +818,13 @@ class AppAdapterSocket {
 		
 	}
 
-	init(topic, processReceivedCallback, onInitSuccessCallback) {
+	setAdapter(adapter) {
+
+		this.adapter = adapter;
+
+	}
+
+	init(topic, onInitSuccessCallback) {
 
 		this.setRoom(topic);
 
@@ -774,13 +832,11 @@ class AppAdapterSocket {
 
 		    console.log('Connected: ' + frame);
 
-		    onInitSuccessCallback();
+		    if (onInitSuccessCallback) onInitSuccessCallback();
 
 		    this.stompClient.subscribe(this.SUBSCRIBE_ENDPOINT + '/' + this.room, (socketMessage) => {
 
-		    	console.log(socketMessage.body);
-
-		    	// processReceivedCallback(JSON.parse(greeting.body));
+		    	this.adapter.processReceivedSocketMessage(JSON.parse(socketMessage.body));
 
 		    });
 
