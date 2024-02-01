@@ -99,11 +99,13 @@ class AppManager {
 
 		this.view = view;
 
-		view.setManager(this);
+		this.view.setManager(this);
 
 		this.state = state;
 
 		this.adapter = new AppAdapter();
+
+		this.adapter.setManager(this);
 
 	}
 
@@ -123,42 +125,47 @@ class AppManager {
 
 	createContest(duration, problems, onCreateSuccess) {
 
-		this.state.setDuration(duration);
+		this.state.createNewContest(duration, problems);
 
-		this.state.setProblems(problems);
+		if (onCreateSuccess) this.createdContestCallback = () => { onCreateSuccess(); };
 
-		this.state.addParticipant(this.state.getUser());
+		this.adapter.sendCreateContest(this.state.clone());
 
-		this.adapter.sendCreateContest(
+	}
 
-			AppStateRequestConvertor.getCreateContestRequest(this.state),
+	createdContest(contestId) {
 
-			() => {
+		console.log('Created contest', contestId);
 
-				onCreateSuccess();
-
-			}
-		);
+		if (this.createdContestCallback) this.createdContestCallback();
 
 	}
 
 	joinContest(inviteCode, onJoinSuccess) {
 
+		if (onJoinSuccess) this.joinedContestCallback = () => { onJoinSuccess(); };
+
 		this.adapter.sendJoinContest(
 
-			AppStateRequestConvertor.getJoinContestRequest(this.state, inviteCode),
+			this.state.clone(),
 
-			(contestResponse) => {
+			inviteCode
 
-				this.state.update(AppStateResponseConvertor.processJoinContestResponse(contestResponse));
-
-			},
-
-			() => {
-
-				onJoinSuccess();
-			}
 		);
+	}
+
+	joinedContest(newState) {
+
+		this.state.update(newState);
+
+		if (this.joinedContestCallback) this.joinedContestCallback();
+
+	}
+
+	participantJoined(joinedUser) {
+
+		this.state.addNewParticipant(joinedUser);
+
 	}
 
 }
@@ -358,6 +365,33 @@ class AppState {
 
 		this.participants = {};
 
+	}
+
+	clone() {
+
+		let cloned = new AppState();
+
+		cloned.setUser(this.user);
+
+		cloned.setDuration(this.duration);
+
+		cloned.setProblems(this.problems);
+
+		cloned.setParticipants(this.participants);
+
+		return cloned;
+
+	}
+
+	createNewContest(duration, problems) {
+
+		this.setDuration(duration);
+
+		this.setProblems(problems);
+
+		this.participants[this.user] = this._newParticipantProblems();
+
+		this._updateUI();
 
 	}
 
@@ -423,11 +457,31 @@ class AppState {
 
 	}
 
+	addNewParticipant(newUser) {
+
+		if (newUser == this.user) return ;
+
+		this.addParticipant(newUser);
+
+	}
+
 	addParticipant(user) {
 
-		this.participants[user] = Array(this.problems.length).fill('');
+		this.participants[user] = this._newParticipantProblems();
 
 		this._updateUI();
+
+	}
+
+	_newParticipantProblems() {
+
+		return Array(this.problems.length).fill('');
+
+	}
+
+	setParticipants(participants) {
+
+		this.participants = structuredClone(participants);
 
 	}
 
@@ -454,7 +508,7 @@ class AppState {
 }
 
 
-const AppStateRequestConvertor = {
+const NetworkRequestGenerator = {
 
 	getCreateContestRequest(state) {
 
@@ -490,11 +544,23 @@ const AppStateRequestConvertor = {
 
 		};
 
+	},
+
+	getSocketRequest(eventType, user, data) {
+
+		if (!data) data = {};
+
+		data.eventType = eventType;
+
+		data.userId = user;
+
+		return data;
+
 	}
 
 }
 
-const AppStateResponseConvertor = {
+const NetworkResponseProcessor = {
 
 	processJoinContestResponse: function(response) {
 
@@ -506,6 +572,24 @@ const AppStateResponseConvertor = {
 
 		return newState;
 		
+	},
+
+	getContestId: function(contestResponse) {
+
+		return contestResponse.sessionId;
+
+	},
+
+	getEventType: function(socketResponse) {
+
+		return socketResponse.eventType;
+
+	},
+
+	getUser: function(socketResponse) {
+
+		return socketResponse.userId;
+
 	}
 
 }
@@ -580,23 +664,49 @@ class AppStateUI {
 
 class AppAdapter {
 
+	SOCKET_EVENT = {
+
+		JOIN: 'JOIN',
+
+		CONTEST_START: 'CONTEST_START',
+
+		SUBMIT_AC: 'SUBMIT_AC',
+
+		CONTEST_END: 'CONTEST_END'
+
+	};
+
 	constructor() {
 
 		this.adapterAjax = new AppAdapterAjax();
 
 		this.adapterSocket = new AppAdapterSocket();
 
+		this.adapterSocket.setAdapter(this);
+
+	}
+
+	setManager(manager) {
+
+		this.manager = manager;
+
 	}
 
 	setUser(user) {
 
-		this.adapterAjax.setUser(user);
-
-		this.adapterSocket.setUser(user);
+		this.user = user;
 
 	}
 
-	sendCreateContest(contestRequest, onCreateSuccess) {
+	getUser() {
+
+		return this.user;
+
+	}
+
+	sendCreateContest(state) {
+
+		let contestRequest = NetworkRequestGenerator.getCreateContestRequest(state);
 
 		this.adapterAjax.sendCreateContestRequest(
 
@@ -606,11 +716,9 @@ class AppAdapter {
 
 				this.adapterSocket.init(
 
-					contestResponse.sessionId, 
+					contestResponse.sessionId,
 
-					this.processReceivedMessage, 
-
-					() => { onCreateSuccess(); }
+					() => { this.manager.createdContest(NetworkResponseProcessor.getContestId(contestResponse)); }
 
 				);
 			}
@@ -618,7 +726,9 @@ class AppAdapter {
 
 	}
 
-	sendJoinContest(joinRequest, stateUpdateCallback, onJoinSuccess) {
+	sendJoinContest(state, inviteCode) {
+
+		let joinRequest = NetworkRequestGenerator.getJoinContestRequest(state, inviteCode);
 
 		this.adapterAjax.sendJoinContestRequest(
 
@@ -626,19 +736,15 @@ class AppAdapter {
 
 			(contestResponse) => {
 
-				stateUpdateCallback(contestResponse);
-
 				this.adapterSocket.init(
 
-					contestResponse.sessionId, 
-
-					this.processReceivedMessage, 
+					contestResponse.sessionId,
 
 					() => {
 
-						onJoinSuccess();
+						this.manager.joinedContest(NetworkResponseProcessor.processJoinContestResponse(contestResponse));
 
-						this.adapterSocket.sendJoinContestMessage();
+						this.adapterSocket.send(NetworkRequestGenerator.getSocketRequest(this.SOCKET_EVENT.JOIN, this.user));
 
 					}
 
@@ -649,16 +755,47 @@ class AppAdapter {
 
 	}
 
-	processReceivedMessage(receivedMessage) {
+	processReceivedSocketMessage(receivedMessage) {
 
-		console.log(receivedMessage)
+		switch (NetworkResponseProcessor.getEventType(receivedMessage)) {
+
+			case this.SOCKET_EVENT.JOIN: 
+				
+				this.receivedUserJoined(NetworkResponseProcessor.getUser(receivedMessage)); 
+				
+				break;
+
+			case this.SOCKET_EVENT.CONTEST_START: 
+				
+				this.receivedContestStart(); 
+				
+				break;
+
+			case this.SOCKET_EVENT.CONTEST_END: 
+				
+				this.receivedContestEnd(); 
+				
+				break;
+
+			case this.SOCKET_EVENT.SUBMIT_AC: 
+				
+				this.receivedSubmissionStatusUpdate(); 
+				
+				break;
+
+			default:
+
+		}
 
 	}
 
+	receivedUserJoined(joinedUser) {
 
+		console.log(joinedUser, " joined");
 
+		this.manager.participantJoined(joinedUser);
 
-	// receivedUserJoined() {}
+	}
 
 	// receivedContestStart() {}
 
@@ -683,12 +820,6 @@ class AppAdapterAjax {
 		CREATE_CONTEST: '',
 
 		JOIN_CONTEST: 'join'
-
-	}
-
-	setUser(user) {
-
-		this.user = user;
 
 	}
 
@@ -738,16 +869,6 @@ class AppAdapterSocket {
 
 	SUBSCRIBE_ENDPOINT = '/cb-topic';
 
-	EVENT = {
-
-		JOIN: 'JOIN',
-
-		SUBMIT_AC: 'SUBMIT_AC',
-
-		CONTEST_END: 'CONTEST_END'
-
-	};
-
 	constructor() {
 
 		this.stompClient = new StompJs.Client({ brokerURL: this.BROKER_URL });
@@ -760,13 +881,13 @@ class AppAdapterSocket {
 
 	}
 
-	setUser(user) {
+	setAdapter(adapter) {
 
-		this.user = user;
-		
+		this.adapter = adapter;
+
 	}
 
-	init(topic, processReceivedCallback, onInitSuccessCallback) {
+	init(topic, onInitSuccessCallback) {
 
 		this.setRoom(topic);
 
@@ -774,13 +895,11 @@ class AppAdapterSocket {
 
 		    console.log('Connected: ' + frame);
 
-		    onInitSuccessCallback();
+		    if (onInitSuccessCallback) onInitSuccessCallback();
 
 		    this.stompClient.subscribe(this.SUBSCRIBE_ENDPOINT + '/' + this.room, (socketMessage) => {
 
-		    	console.log(socketMessage.body);
-
-		    	// processReceivedCallback(JSON.parse(greeting.body));
+		    	this.adapter.processReceivedSocketMessage(JSON.parse(socketMessage.body));
 
 		    });
 
@@ -797,18 +916,6 @@ class AppAdapterSocket {
 
 
 		this.stompClient.activate();
-
-	}
-
-	sendJoinContestMessage() {
-
-		this.send({
-
-			eventType: this.EVENT.JOIN,
-
-			userId: this.user
-
-		});
 
 	}
 
