@@ -1,6 +1,7 @@
 package com.rakesh.codingbattle.entity;
 
 
+import com.rakesh.codingbattle.enums.ContestStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -21,9 +22,11 @@ public class Contest {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
     private String name = "A Simple Contest";
-
     private String createdBy;
+    private long createdAt;
+    private long startedAt;
+    private ContestStatus contestStatus;
+
 
 }
