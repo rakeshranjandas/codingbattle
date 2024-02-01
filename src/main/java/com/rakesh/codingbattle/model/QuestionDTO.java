@@ -11,4 +11,6 @@ public class QuestionDTO {
 
     private String name;
 
+    private Long contestQuestionId;
+
 }
