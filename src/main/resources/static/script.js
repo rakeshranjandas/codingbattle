@@ -131,9 +131,11 @@ class AppManager {
 
 	}
 
-	createdContest(contestId) {
+	createdContest(contestId, newState) {
 
 		console.log('Created contest', contestId);
+
+		this.state.update(newState);
 
 		this.view.ready();
 
@@ -205,7 +207,7 @@ class AppView {
 
 		let duration = this.fields.getDuration();
 
-		let problems = this.fields.getProblems().split('\n').filter(x => x);
+		let problems = this.fields.getProblems().split('\n').filter(x => x).map((x) => {return {'url': x}});
 
 		if (duration === '' || problems.length === 0) {
 
@@ -523,7 +525,7 @@ const NetworkRequestGenerator = {
 			
 			name: "temp_problem_name",
 
-			url: problem
+			url: problem.url
 
 		}
 
@@ -565,16 +567,28 @@ const NetworkRequestGenerator = {
 
 const NetworkResponseProcessor = {
 
-	processJoinContestResponse: function(response) {
+	_generateNewAppStateFromResponse: function(response) {
 
 		let newState = new AppState();
 
-		newState.setProblems(response.questions.map((problem) => problem.url));
+		newState.setProblems(response.questions.map((problem) => {return {url: problem.url, contestQuestionId: problem.contestQuestionId}}));
 
-		response.users.forEach((user) => { newState.addParticipant(user.userId); })
+		response.users.forEach((user) => { newState.addParticipant(user.userId); });
 
 		return newState;
-		
+
+	},
+
+	processCreateContestResponse: function(response) {
+
+		return this._generateNewAppStateFromResponse(response);
+
+	},
+
+	processJoinContestResponse: function(response) {
+
+		return this._generateNewAppStateFromResponse(response);
+
 	},
 
 	getContestId: function(contestResponse) {
@@ -734,7 +748,17 @@ class AppAdapter {
 
 					contestResponse.sessionId,
 
-					() => { this.manager.createdContest(NetworkResponseProcessor.getContestId(contestResponse)); }
+					() => {
+
+						this.manager.createdContest(
+
+							NetworkResponseProcessor.getContestId(contestResponse),
+
+							NetworkResponseProcessor.processCreateContestResponse(contestResponse)
+
+						); 
+
+					}
 
 				);
 			}
