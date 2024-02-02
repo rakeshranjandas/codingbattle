@@ -7,4 +7,8 @@ import lombok.Data;
 @AllArgsConstructor
 public class SubmitEvent extends Event{
     private Long contestQuestionId;
+
+    public SubmitEvent() {
+        super();
+    }
 }
