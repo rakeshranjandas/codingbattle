@@ -84,7 +84,7 @@ public class ContestService {
         var contestUsersList = contestUsersRepository.findByContestId(contestId);
 
         Contest contestResponse = new Contest();
-        contestResponse.setQuestions(contestQuestionsList.stream().map((contestQuestions) -> QuestionDTO.builder().url(contestQuestions.getUrl()).build()).collect(Collectors.toList())); ;
+        contestResponse.setQuestions(contestQuestionsList.stream().map(ContestQuestions::from).collect(Collectors.toList()));
         contestResponse.setSessionId(String.valueOf(contestId));
         contestResponse.setUsers(contestUsersList.stream().map((contestUser) -> UserDTO.builder().userId(contestUser.getUserId()).build()).collect(Collectors.toList()));
 
