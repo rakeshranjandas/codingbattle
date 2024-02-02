@@ -56,7 +56,7 @@ public class ContestService {
 
         }
 
-        contestQuestionsRepository.saveAll(contestQuestionsToSave);
+        var contestQuestionsSaved = contestQuestionsRepository.saveAll(contestQuestionsToSave);
 
         ContestUsers contestUsers = new ContestUsers();
         contestUsers.setContestId(contestSavedId);
@@ -64,7 +64,7 @@ public class ContestService {
         contestUsersRepository.save(contestUsers);
 
         Contest contestResponse = new Contest();
-        contestResponse.setQuestions(createContestRequest.getQuestions());
+        contestResponse.setQuestions(contestQuestionsSaved.stream().map(ContestQuestions::from).collect(Collectors.toList()));
         contestResponse.setSessionId(String.valueOf(contestSavedId));
         contestResponse.setUsers(List.of(new UserDTO(createContestRequest.getUserId())));
 

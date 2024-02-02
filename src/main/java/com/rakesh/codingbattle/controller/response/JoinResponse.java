@@ -8,6 +8,6 @@ import lombok.Data;
 @Data
 public class JoinResponse {
     private String userId;
-    private EventType eventType;
+    private final EventType eventType = EventType.JOIN;
 
 }
