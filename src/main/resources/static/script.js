@@ -123,11 +123,9 @@ class AppManager {
 
 	}
 
-	createContest(duration, problems, onCreateSuccess) {
+	createContest(duration, problems) {
 
 		this.state.createNewContest(duration, problems);
-
-		if (onCreateSuccess) this.createdContestCallback = () => { onCreateSuccess(); };
 
 		this.adapter.sendCreateContest(this.state.clone());
 
@@ -137,13 +135,11 @@ class AppManager {
 
 		console.log('Created contest', contestId);
 
-		if (this.createdContestCallback) this.createdContestCallback();
+		this.view.ready();
 
 	}
 
-	joinContest(inviteCode, onJoinSuccess) {
-
-		if (onJoinSuccess) this.joinedContestCallback = () => { onJoinSuccess(); };
+	joinContest(inviteCode) {
 
 		this.adapter.sendJoinContest(
 
@@ -158,7 +154,7 @@ class AppManager {
 
 		this.state.update(newState);
 
-		if (this.joinedContestCallback) this.joinedContestCallback();
+		this.view.ready();
 
 	}
 
@@ -227,7 +223,6 @@ class AppView {
 
 			problems,
 
-			() => { this.fields.changeState(this.fields.STATE.READY) }
 		);
 
 	}
@@ -246,14 +241,14 @@ class AppView {
 
 		this.fields.changeState(this.fields.STATE.CONNECTING);
 
-		this.manager.joinContest(
+		this.manager.joinContest(inviteCode);
 
-			inviteCode,
+	}
 
-			() => { this.fields.changeState(this.fields.STATE.READY) }
+	ready() {
 
-		);
-
+		this.fields.changeState(this.fields.STATE.READY)
+	
 	}
 
 }
