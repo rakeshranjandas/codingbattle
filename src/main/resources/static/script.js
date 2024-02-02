@@ -546,15 +546,23 @@ const NetworkRequestGenerator = {
 
 	},
 
-	getSocketRequest(eventType, user, data) {
+	getSocketRequest(socketEvent, user, problemId) {
 
-		if (!data) data = {};
+		let data = {};
 
-		data.eventType = eventType;
+		data.eventType = socketEvent.eventType;
 
 		data.userId = user;
 
-		return data;
+		if (problemId) data.problemId = problemId;
+
+		return {
+
+			getDestination: (path) => { return path + (socketEvent.destinationSuffix.length?('/'+socketEvent.destinationSuffix):''); },
+
+			data: data
+
+		};
 
 	}
 
@@ -586,11 +594,24 @@ const NetworkResponseProcessor = {
 
 	},
 
+	getHandler: function (socketResponse, socketEventSettings) {
+
+		for (const [key, entry] of Object.entries(socketEventSettings)) {
+
+			if (entry.eventType === this.getEventType(socketResponse)) {
+
+				return entry.handlerFn;
+
+			}
+		}
+
+	},
+
 	getUser: function(socketResponse) {
 
 		return socketResponse.userId;
 
-	}
+	},
 
 }
 
@@ -666,13 +687,13 @@ class AppAdapter {
 
 	SOCKET_EVENT = {
 
-		JOIN: 'JOIN',
+		JOIN: { eventType: 'JOIN', destinationSuffix: '', handlerFn: 'receivedUserJoined' },
 
-		CONTEST_START: 'CONTEST_START',
+		CONTEST_START: { eventType: 'CONTEST_START', destinationSuffix: 'contest', handlerFn: 'receivedContestStart'},
 
-		SUBMIT_AC: 'SUBMIT_AC',
+		SUBMIT_AC: { eventType: 'SUBMIT_AC', destinationSuffix: 'submit', handlerFn: 'receivedSubmissionAccepted'},
 
-		CONTEST_END: 'CONTEST_END'
+		CONTEST_END: { eventType: 'CONTEST_END', destinationSuffix: '', handlerFn: 'receivedContestEnd'},
 
 	};
 
@@ -757,39 +778,15 @@ class AppAdapter {
 
 	processReceivedSocketMessage(receivedMessage) {
 
-		switch (NetworkResponseProcessor.getEventType(receivedMessage)) {
+		let handlerFn = NetworkResponseProcessor.getHandler(receivedMessage, this.SOCKET_EVENT);
 
-			case this.SOCKET_EVENT.JOIN: 
-				
-				this.receivedUserJoined(NetworkResponseProcessor.getUser(receivedMessage)); 
-				
-				break;
-
-			case this.SOCKET_EVENT.CONTEST_START: 
-				
-				this.receivedContestStart(); 
-				
-				break;
-
-			case this.SOCKET_EVENT.CONTEST_END: 
-				
-				this.receivedContestEnd(); 
-				
-				break;
-
-			case this.SOCKET_EVENT.SUBMIT_AC: 
-				
-				this.receivedSubmissionStatusUpdate(); 
-				
-				break;
-
-			default:
-
-		}
+		if (this[handlerFn]) this[handlerFn](receivedMessage);
 
 	}
 
-	receivedUserJoined(joinedUser) {
+	receivedUserJoined(receivedMessage) {
+
+		let joinedUser = NetworkResponseProcessor.getUser(receivedMessage);
 
 		console.log(joinedUser, " joined");
 
@@ -803,9 +800,29 @@ class AppAdapter {
 
 	// receivedTimerUpdate() {}
 
-	// sendSubmissionStatusForProblem() {}
+	sendSubmissionAccepted(problemIndex) {
 
-	// receivedSubmissionStatusUpdate() {}
+		this.adapterSocket.send(
+
+			NetworkRequestGenerator.getSocketRequest(
+
+				this.SOCKET_EVENT.SUBMIT_AC, 
+
+				this.user, 
+
+				problemIndex
+
+			)
+
+		);
+
+	}
+
+	receivedSubmissionAccepted(user, problemIndex) {
+
+		this.manager.participantSubmissionAccepted(user, problemIndex);
+
+	}
 
 	// terminateConnections() {}
 
@@ -919,13 +936,13 @@ class AppAdapterSocket {
 
 	}
 
-	send(data) {
+	send(socketRequest) {
 
 	    this.stompClient.publish({
 
-	        destination: this.PUBLISH_DESTINATION + '/' + this.room,
+	        destination: socketRequest.getDestination(this.PUBLISH_DESTINATION + '/' + this.room),
 
-	        body: JSON.stringify(data)
+	        body: JSON.stringify(socketRequest.data)
 
 	    });
 
