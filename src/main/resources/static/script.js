@@ -170,9 +170,16 @@ class AppManager {
 
 		this.state.updateSubmissionAccepted(problemId);
 
-		// this.adapter.sendSubmissionAccepted(problemIndex);
+		this.adapter.sendSubmissionAccepted(problemId);
 
 	}
+
+	participantSubmissionAccepted(user, problemId) {
+
+		this.state.updateSubmissionAccepted(problemId, user);
+
+	}
+
 }
 
 
@@ -564,7 +571,7 @@ const NetworkRequestGenerator = {
 
 		data.userId = user;
 
-		if (problemId) data.problemId = problemId;
+		if (problemId) data.contestQuestionId = problemId;
 
 		return {
 
@@ -634,6 +641,12 @@ const NetworkResponseProcessor = {
 		return socketResponse.userId;
 
 	},
+
+	getProblemId: function(socketResponse) {
+
+		return socketResponse.contestQuestionId;
+
+	}
 
 }
 
@@ -832,7 +845,7 @@ class AppAdapter {
 
 	// receivedTimerUpdate() {}
 
-	sendSubmissionAccepted(problemIndex) {
+	sendSubmissionAccepted(problemId) {
 
 		this.adapterSocket.send(
 
@@ -842,7 +855,7 @@ class AppAdapter {
 
 				this.user, 
 
-				problemIndex
+				problemId
 
 			)
 
@@ -850,9 +863,17 @@ class AppAdapter {
 
 	}
 
-	receivedSubmissionAccepted(user, problemIndex) {
+	receivedSubmissionAccepted(receivedMessage) {
 
-		this.manager.participantSubmissionAccepted(user, problemIndex);
+		console.log('receivedSubmissionAccepted', receivedMessage);
+
+		this.manager.participantSubmissionAccepted(
+
+			NetworkResponseProcessor.getUser(receivedMessage),
+
+			NetworkResponseProcessor.getProblemId(receivedMessage)
+
+		);
 
 	}
 
