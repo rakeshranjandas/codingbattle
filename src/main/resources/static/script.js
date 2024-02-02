@@ -166,6 +166,13 @@ class AppManager {
 
 	}
 
+	submissionAccepted(problemId) {
+
+		this.state.updateSubmissionAccepted(problemId);
+
+		// this.adapter.sendSubmissionAccepted(problemIndex);
+
+	}
 }
 
 
@@ -488,9 +495,15 @@ class AppState {
 
 	}
 
-	updateSubmissionAccepted(user, problemIndex) {
+	updateSubmissionAccepted(problemId, user) {
 
-		this.participants[user][problemIndex] = 'AC';
+		if (user === this.user) return;
+
+		if (!user) user = this.user;
+
+		let index = this.problems.findIndex(problem => problem.id === problemId);
+
+		this.participants[user][index] = 'AC';
 
 		this._updateUI();
 
@@ -571,7 +584,7 @@ const NetworkResponseProcessor = {
 
 		let newState = new AppState();
 
-		newState.setProblems(response.questions.map((problem) => {return {url: problem.url, contestQuestionId: problem.contestQuestionId}}));
+		newState.setProblems(response.questions.map((problem) => {return {url: problem.url, id: problem.contestQuestionId}}));
 
 		response.users.forEach((user) => { newState.addParticipant(user.userId); });
 
@@ -661,7 +674,7 @@ class AppStateUI {
 
 		};
 
-		let table = this.getTable(participants[this.appState.getUser()].length, tableContentHTML);
+		let table = this.getTableLayout(participants[this.appState.getUser()].length, tableContentHTML);
 
 		return table;
 	}
@@ -670,14 +683,14 @@ class AppStateUI {
 
 		let row = `<tr><td>${participantName}</td>`;
 
-		problemStatusArr.forEach((status) => { row += `<td>${status}</td>` } );
+		problemStatusArr.forEach((status) => { row += `<td>${status=='AC'?'&check;':''}</td>` } );
 
 		row += '</td>';
 
 		return row;
 	}
 
-	getTable(problemsLength, tableContent) {
+	getTableLayout(problemsLength, tableContent) {
 
 		let tableHead = '<thead><tr><th>user</th>';
 
