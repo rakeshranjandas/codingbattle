@@ -21,4 +21,6 @@ public class Contest {
 
     private List<UserDTO> users;
 
+    private int duration;
+
 }

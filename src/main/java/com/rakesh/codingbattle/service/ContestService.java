@@ -79,6 +79,7 @@ public class ContestService {
         contestResponse.setQuestions(contestQuestionsSaved.stream().map(ContestQuestions::from).collect(Collectors.toList()));
         contestResponse.setSessionId(String.valueOf(contestSavedId));
         contestResponse.setUsers(List.of(new UserDTO(createContestRequest.getUserId())));
+        contestResponse.setDuration(contestSaved.getDuration());
 
         return contestResponse;
     }
@@ -94,12 +95,13 @@ public class ContestService {
 
         var contestQuestionsList = contestQuestionsRepository.findByContestId(contestId);
         var contestUsersList = contestUsersRepository.findByContestId(contestId);
-
+        var contest = contestRepository.findById(Long.parseLong(joinContestRequest.getSessionId()))
+                .orElse(new com.rakesh.codingbattle.entity.Contest());
         Contest contestResponse = new Contest();
         contestResponse.setQuestions(contestQuestionsList.stream().map(ContestQuestions::from).collect(Collectors.toList()));
         contestResponse.setSessionId(String.valueOf(contestId));
         contestResponse.setUsers(contestUsersList.stream().map((contestUser) -> UserDTO.builder().userId(contestUser.getUserId()).build()).collect(Collectors.toList()));
-
+        contestResponse.setDuration(contest.getDuration());
         return contestResponse;
     }
 
