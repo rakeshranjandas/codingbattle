@@ -13,6 +13,7 @@ import com.rakesh.codingbattle.repository.ContestQuestionsRepository;
 import com.rakesh.codingbattle.repository.ContestRepository;
 import com.rakesh.codingbattle.repository.ContestUsersRepository;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
@@ -26,6 +27,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+@Slf4j
 @AllArgsConstructor
 @Service
 public class ContestService {
@@ -49,6 +51,7 @@ public class ContestService {
         contest.setCreatedBy(createContestRequest.getUserId());
         contest.setContestStatus(ContestStatus.NOT_STARTED);
         contest.setCreatedAt(Instant.now().toEpochMilli());
+        contest.setDuration(createContestRequest.getDuration());
 
         var contestSaved = contestRepository.save(contest);
         var contestSavedId = contestSaved.getId();
@@ -101,19 +104,21 @@ public class ContestService {
     }
 
     @Transactional
-    public void handleStartMessage(String id, String userId, int durationInMins) {
+    public void handleStartMessage(String id) {
         var contest = contestRepository.findById(Long.parseLong(id))
                 .orElseThrow(() -> new HttpClientErrorException(HttpStatus.NOT_FOUND, "Invalid contest id"));
 
         contest.setContestStatus(ContestStatus.RUNNING);
         long startTime = Instant.now().plusSeconds(10).toEpochMilli();
         contest.setStartedAt(startTime);
-        scheduler.schedule(()->closeWebSocketAfterDuration(id), durationInMins, TimeUnit.MINUTES);
+        scheduler.schedule(()->closeWebSocketAfterDuration(id, contest), contest.getDuration(), TimeUnit.MINUTES);
         contestRepository.save(contest);
     }
 
-    private void closeWebSocketAfterDuration(String id) {
+    private void closeWebSocketAfterDuration(String id, com.rakesh.codingbattle.entity.Contest contest) {
         messagingTemplate.convertAndSend("/cb-topic/"+id, new Event(EventType.CONTEST_END, "SYSTEM"));
+        contest.setContestStatus(ContestStatus.ENDED);
+        log.info("Contest id {} ended at {}", contest.getId(), Instant.now());
         scheduler.shutdownNow();
     }
 
