@@ -578,6 +578,8 @@ const NetworkRequestGenerator = {
 
 			questions: state.getProblems().map((problem) => { return this._formatQuestion(problem); }),
 
+			duration: state.getDuration()
+
 		};
 
 	},
@@ -637,6 +639,8 @@ const NetworkResponseProcessor = {
 		newState.setProblems(response.questions.map((problem) => {return {url: problem.url, id: problem.contestQuestionId}}));
 
 		response.users.forEach((user) => { newState.addParticipant(user.userId); });
+
+		newState.setDuration(response.duration);
 
 		return newState;
 
@@ -732,7 +736,15 @@ class AppStateUI {
 
 		let table = this.getTableLayout(participants[this.appState.getUser()].length, tableContentHTML);
 
-		return table;
+		let duration = this.getDurationSection(this.appState.getDuration());
+
+		return duration + table;
+	}
+
+	getDurationSection(duration) {
+
+		return `<p>Duration: ${duration}</p>`;
+
 	}
 
 	getTableContentHTML(participantName, problemStatusArr) {
