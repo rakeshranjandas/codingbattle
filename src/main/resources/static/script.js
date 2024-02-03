@@ -579,6 +579,92 @@ class AppState {
 
 }
 
+class AppTimer {
+
+	_STATES = {
+
+		SETUP: 'SETUP',
+
+		RUNNING: 'RUNNING',
+
+		ENDED: 'ENDED'
+
+	};
+
+	constructor(durationInSeconds) {
+
+		this._durationInSeconds = durationInSeconds ? durationInSeconds: 10;
+
+		this._state = this._STATES.SETUP;
+
+	}
+
+	setDurationInSeconds(durationInSeconds) {
+
+		this._durationInSeconds = durationInSeconds;
+
+	}
+
+	setStartTime(startTimeTimeStamp) {
+
+		this._durationInSeconds = Math.max(1, Math.floor((startTimeTimeStamp - new Date().getTime())) / 1000);
+
+	}
+
+	setCallbackOnTick(callback) {
+
+		this._callbackOnTick = callback;
+
+	}
+
+	setCallbackOnEnd(callback) {
+
+		this._callbackOnEnd = callback;
+
+	}
+
+	start() {
+
+		if (this._state != this._STATES.SETUP) return;
+
+		this._state = this._STATES.RUNNING;		
+
+		this._elapsedSeconds = 0;
+
+		this._intervalId = setInterval(() => {
+
+			this._elapsedSeconds++;
+
+			if (this._elapsedSeconds >= this._durationInSeconds) this._state = this._STATES.ENDED;
+
+			if (this._state === this._STATES.RUNNING) this._ticking();
+
+			else if (this._state === this._STATES.ENDED) this._ended();
+
+		}, 1000);
+
+	}
+
+	_ticking() {
+
+		console.log('Timer tick', this._elapsedSeconds);
+
+		if (this._callbackOnTick) this._callbackOnTick(this._durationInSeconds - this._elapsedSeconds);
+
+	}
+
+	_ended() {
+
+		console.log('Timer ended');
+
+		clearInterval(this._intervalId);
+
+		if (this._callbackOnEnd) this._callbackOnEnd();
+
+	}
+
+}
+
 
 const NetworkRequestGenerator = {
 
