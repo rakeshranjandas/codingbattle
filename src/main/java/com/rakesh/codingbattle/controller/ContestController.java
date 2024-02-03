@@ -47,8 +47,7 @@ public class ContestController {
     @MessageMapping("/contest/{id}/start")
     @SendTo("/cb-topic/{id}")
     public ContestStartResponse handleStartMessage(@DestinationVariable String id, Event event) {
-        contestService.handleStartMessage(id);
-        return new ContestStartResponse(event.getEventType(), Instant.now().toEpochMilli(), event.getUserId());
+        return contestService.handleStartMessage(id, event);
     }
 
     @MessageMapping("/contest/{id}/submit")

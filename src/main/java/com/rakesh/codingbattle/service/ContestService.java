@@ -3,6 +3,7 @@ package com.rakesh.codingbattle.service;
 import com.rakesh.codingbattle.controller.request.CreateContestRequest;
 import com.rakesh.codingbattle.controller.request.JoinContestRequest;
 import com.rakesh.codingbattle.controller.response.Contest;
+import com.rakesh.codingbattle.controller.response.ContestStartResponse;
 import com.rakesh.codingbattle.entity.ContestQuestions;
 import com.rakesh.codingbattle.entity.ContestUsers;
 import com.rakesh.codingbattle.enums.ContestStatus;
@@ -106,7 +107,7 @@ public class ContestService {
     }
 
     @Transactional
-    public void handleStartMessage(String id) {
+    public ContestStartResponse handleStartMessage(String id, Event event) {
         var contest = contestRepository.findById(Long.parseLong(id))
                 .orElseThrow(() -> new HttpClientErrorException(HttpStatus.NOT_FOUND, "Invalid contest id"));
 
@@ -114,7 +115,13 @@ public class ContestService {
         long startTime = Instant.now().plusSeconds(10).toEpochMilli();
         contest.setStartedAt(startTime);
         scheduler.schedule(()->closeWebSocketAfterDuration(id, contest), contest.getDuration(), TimeUnit.MINUTES);
-        contestRepository.save(contest);
+        var savedContest = contestRepository.save(contest);
+        return ContestStartResponse.builder()
+                .eventType(EventType.CONTEST_START)
+                .startedAt(savedContest.getStartedAt())
+                .startedBy(event.getUserId())
+                .build();
+
     }
 
     private void closeWebSocketAfterDuration(String id, com.rakesh.codingbattle.entity.Contest contest) {
