@@ -131,7 +131,7 @@ class AppManager {
 
 	}
 
-	createdContest(contestId, newState) {
+	contestCreated(contestId, newState) {
 
 		console.log('Created contest', contestId);
 
@@ -152,7 +152,7 @@ class AppManager {
 		);
 	}
 
-	joinedContest(newState) {
+	contestJoined(newState) {
 
 		this.state.update(newState);
 
@@ -163,6 +163,24 @@ class AppManager {
 	participantJoined(joinedUser) {
 
 		this.state.addNewParticipant(joinedUser);
+
+	}
+
+	startContest() {
+
+		this.adapter.sendStartContest();
+
+	}
+
+	contestStarted() {
+
+		this.view.running();
+
+	}
+
+	contestEnded() {
+
+		this.view.ended();
 
 	}
 
@@ -263,8 +281,20 @@ class AppView {
 
 	ready() {
 
-		this.fields.changeState(this.fields.STATE.READY)
+		this.fields.changeState(this.fields.STATE.READY);
 	
+	}
+
+	running() {
+
+		this.fields.changeState(this.fields.STATE.RUNNING);
+
+	}
+
+	ended() {
+
+		this.fields.changeState(this.fields.STATE.ENDED);
+
 	}
 
 }
@@ -283,9 +313,10 @@ class AppViewFields {
 		CREATE_PROBLEMS_TEXTAREA: '#create_problems_textarea',
 		JOIN_CODE_TEXT: '#join_code_text',
 
-		READY_DIV: '#ready_div',
-
 		CONNECTING_DIV: '#connecting_div',
+		READY_DIV: '#ready_div',
+		RUNNING_DIV: '#running_div',
+		ENDED_DIV: '#ended_div',
 
 	};
 
@@ -313,7 +344,19 @@ class AppViewFields {
 
 			$(this.SELECTORS.READY_DIV).show();
 
-		}
+		},
+
+		RUNNING: () => {
+
+			$(this.SELECTORS.RUNNING_DIV).show();
+
+		},
+
+		ENDED: () => {
+
+			$(this.SELECTORS.ENDED_DIV).show();
+
+		},
 
 	}
 
@@ -724,7 +767,7 @@ class AppAdapter {
 
 		JOIN: { eventType: 'JOIN', destinationSuffix: '', handlerFn: 'receivedUserJoined' },
 
-		CONTEST_START: { eventType: 'CONTEST_START', destinationSuffix: 'contest', handlerFn: 'receivedContestStart'},
+		CONTEST_START: { eventType: 'CONTEST_START', destinationSuffix: 'start', handlerFn: 'receivedContestStart'},
 
 		SUBMIT_AC: { eventType: 'SUBMIT_AC', destinationSuffix: 'submit', handlerFn: 'receivedSubmissionAccepted'},
 
@@ -776,7 +819,7 @@ class AppAdapter {
 
 					() => {
 
-						this.manager.createdContest(
+						this.manager.contestCreated(
 
 							NetworkResponseProcessor.getContestId(contestResponse),
 
@@ -808,7 +851,7 @@ class AppAdapter {
 
 					() => {
 
-						this.manager.joinedContest(NetworkResponseProcessor.processJoinContestResponse(contestResponse));
+						this.manager.contestJoined(NetworkResponseProcessor.processJoinContestResponse(contestResponse));
 
 						this.adapterSocket.send(NetworkRequestGenerator.getSocketRequest(this.SOCKET_EVENT.JOIN, this.user));
 
@@ -839,11 +882,36 @@ class AppAdapter {
 
 	}
 
-	// receivedContestStart() {}
+	sendStartContest() {
 
-	// receivedContestEnd() {}
+		this.adapterSocket.send(
 
-	// receivedTimerUpdate() {}
+			NetworkRequestGenerator.getSocketRequest(
+
+				this.SOCKET_EVENT.CONTEST_START, 
+
+				this.user
+
+			)
+
+		);
+
+	}
+
+	receivedContestStart(socketMessage) {
+
+		console.log('receivedContestStart', socketMessage);
+		
+		this.manager.contestStarted();
+
+	}
+
+	receivedContestEnd(socketMessage) {
+
+		this.manager.contestEnded();
+
+	}
+
 
 	sendSubmissionAccepted(problemId) {
 
