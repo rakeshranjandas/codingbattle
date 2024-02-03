@@ -6,13 +6,15 @@ import com.rakesh.codingbattle.controller.response.Contest;
 import com.rakesh.codingbattle.entity.ContestQuestions;
 import com.rakesh.codingbattle.entity.ContestUsers;
 import com.rakesh.codingbattle.enums.ContestStatus;
-import com.rakesh.codingbattle.model.QuestionDTO;
+import com.rakesh.codingbattle.enums.EventType;
+import com.rakesh.codingbattle.model.Event;
 import com.rakesh.codingbattle.model.UserDTO;
 import com.rakesh.codingbattle.repository.ContestQuestionsRepository;
 import com.rakesh.codingbattle.repository.ContestRepository;
 import com.rakesh.codingbattle.repository.ContestUsersRepository;
 import lombok.AllArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 
@@ -20,17 +22,24 @@ import javax.transaction.Transactional;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @AllArgsConstructor
 @Service
 public class ContestService {
 
-    private ContestRepository contestRepository;
+    private final ScheduledExecutorService scheduler;
 
-    private ContestQuestionsRepository contestQuestionsRepository;
+    private final SimpMessagingTemplate messagingTemplate;
 
-    private ContestUsersRepository contestUsersRepository;
+    private final ContestRepository contestRepository;
+
+    private final ContestQuestionsRepository contestQuestionsRepository;
+
+    private final ContestUsersRepository contestUsersRepository;
+
 
     @Transactional(rollbackOn =  Exception.class)
     public Contest createContest(CreateContestRequest createContestRequest) {
@@ -92,12 +101,20 @@ public class ContestService {
     }
 
     @Transactional
-    public void handleStartMessage(String id, String userId) {
+    public void handleStartMessage(String id, String userId, int durationInMins) {
         var contest = contestRepository.findById(Long.parseLong(id))
                 .orElseThrow(() -> new HttpClientErrorException(HttpStatus.NOT_FOUND, "Invalid contest id"));
 
         contest.setContestStatus(ContestStatus.RUNNING);
-        contest.setStartedAt(Instant.now().plusSeconds(10).toEpochMilli());
+        long startTime = Instant.now().plusSeconds(10).toEpochMilli();
+        contest.setStartedAt(startTime);
+        scheduler.schedule(()->closeWebSocketAfterDuration(id), durationInMins, TimeUnit.MINUTES);
         contestRepository.save(contest);
     }
+
+    private void closeWebSocketAfterDuration(String id) {
+        messagingTemplate.convertAndSend("/cb-topic/"+id, new Event(EventType.CONTEST_END, "SYSTEM"));
+        scheduler.shutdownNow();
+    }
+
 }
