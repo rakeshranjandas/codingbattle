@@ -85,6 +85,12 @@ const AppActions = {
 
 	},
 
+	startContest() {
+
+		AppObjectStore.getAppView().startContest();
+
+	},
+
 	joinContest() {
 
 		AppObjectStore.getAppView().joinContest();
@@ -279,6 +285,12 @@ class AppView {
 
 	}
 
+	startContest() {
+
+		this.manager.startContest();
+
+	}
+
 	ready() {
 
 		this.fields.changeState(this.fields.STATE.READY);
@@ -439,9 +451,9 @@ class AppState {
 
 	createNewContest(duration, problems) {
 
-		this.setDuration(duration);
+		this.duration = duration;
 
-		this.setProblems(problems);
+		this.problems = structuredClone(problems);
 
 		this.participants[this.user] = this._newParticipantProblems();
 
