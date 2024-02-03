@@ -14,5 +14,6 @@ public class CreateContestRequest {
 
     private List<QuestionDTO> questions;
     private String userId;
+    private int duration;
 
 }

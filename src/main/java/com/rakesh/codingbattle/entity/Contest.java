@@ -31,6 +31,6 @@ public class Contest {
     private long createdAt;
     private long startedAt;
     private ContestStatus contestStatus;
-
+    private int duration;
 
 }

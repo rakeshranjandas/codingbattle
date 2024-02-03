@@ -7,7 +7,6 @@ import com.rakesh.codingbattle.controller.response.ContestStartResponse;
 import com.rakesh.codingbattle.controller.response.ContestSubmitResponse;
 import com.rakesh.codingbattle.controller.response.JoinResponse;
 import com.rakesh.codingbattle.model.Event;
-import com.rakesh.codingbattle.model.StartEvent;
 import com.rakesh.codingbattle.model.SubmitEvent;
 import com.rakesh.codingbattle.service.ContestService;
 import lombok.AllArgsConstructor;
@@ -47,8 +46,8 @@ public class ContestController {
 
     @MessageMapping("/contest/{id}/start")
     @SendTo("/cb-topic/{id}")
-    public ContestStartResponse handleStartMessage(@DestinationVariable String id, StartEvent event) {
-        contestService.handleStartMessage(id, event.getUserId(), event.getDurationInMins());
+    public ContestStartResponse handleStartMessage(@DestinationVariable String id, Event event) {
+        contestService.handleStartMessage(id);
         return new ContestStartResponse(event.getEventType(), Instant.now().toEpochMilli(), event.getUserId());
     }
 
