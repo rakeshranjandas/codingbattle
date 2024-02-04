@@ -24,6 +24,7 @@ import javax.transaction.Transactional;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -32,8 +33,6 @@ import java.util.stream.Collectors;
 @AllArgsConstructor
 @Service
 public class ContestService {
-
-    private final ScheduledExecutorService scheduler;
 
     private final SimpMessagingTemplate messagingTemplate;
 
@@ -108,23 +107,27 @@ public class ContestService {
 
     @Transactional
     public ContestStartResponse handleStartMessage(String id, Event event) {
-        var contest = contestRepository.findById(Long.parseLong(id))
-                .orElseThrow(() -> new HttpClientErrorException(HttpStatus.NOT_FOUND, "Invalid contest id"));
 
-        contest.setContestStatus(ContestStatus.RUNNING);
-        long startTime = Instant.now().plusSeconds(10).toEpochMilli();
-        contest.setStartedAt(startTime);
-        scheduler.schedule(()->closeWebSocketAfterDuration(id, contest), contest.getDuration(), TimeUnit.MINUTES);
-        var savedContest = contestRepository.save(contest);
-        return ContestStartResponse.builder()
-                .eventType(EventType.CONTEST_START)
-                .startedAt(savedContest.getStartedAt())
-                .startedBy(event.getUserId())
-                .build();
+
+            var contest = contestRepository.findById(Long.parseLong(id))
+                    .orElseThrow(() -> new HttpClientErrorException(HttpStatus.NOT_FOUND, "Invalid contest id"));
+
+            contest.setContestStatus(ContestStatus.RUNNING);
+            long startTime = Instant.now().plusSeconds(10).toEpochMilli();
+            contest.setStartedAt(startTime);
+            var scheduler = Executors.newScheduledThreadPool(1);
+            scheduler.schedule(() -> closeWebSocketAfterDuration(id, contest, scheduler), contest.getDuration(), TimeUnit.MINUTES);
+            var savedContest = contestRepository.save(contest);
+            return ContestStartResponse.builder()
+                    .eventType(EventType.CONTEST_START)
+                    .startedAt(savedContest.getStartedAt())
+                    .startedBy(event.getUserId())
+                    .build();
 
     }
 
-    private void closeWebSocketAfterDuration(String id, com.rakesh.codingbattle.entity.Contest contest) {
+    private void closeWebSocketAfterDuration(String id, com.rakesh.codingbattle.entity.Contest contest, ScheduledExecutorService scheduler) {
+        log.info("Close socket invoked");
         messagingTemplate.convertAndSend("/cb-topic/"+id, new Event(EventType.CONTEST_END, "SYSTEM"));
         contest.setContestStatus(ContestStatus.ENDED);
         log.info("Contest id {} ended at {}", contest.getId(), Instant.now());

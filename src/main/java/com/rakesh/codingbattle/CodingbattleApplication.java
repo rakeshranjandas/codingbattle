@@ -15,11 +15,5 @@ public class CodingbattleApplication {
 	public static void main(String[] args) {
 		SpringApplication.run(CodingbattleApplication.class, args);
 	}
-
-	@Bean
-	public ScheduledExecutorService scheduledExecutorService() {
-		return Executors.newScheduledThreadPool(1);
-	}
-
 }
 
