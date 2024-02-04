@@ -176,6 +176,8 @@ class AppManager {
 
 	startContest() {
 
+		this.view.countdown();
+
 		this.adapter.sendStartContest();
 
 	}
@@ -311,9 +313,15 @@ class AppView {
 	
 	}
 
-	running() {
+	countdown(countdownInSeconds) {
 
-		this.fields.changeState(this.fields.STATE.RUNNING);
+		this.fields.changeState(this.fields.STATE.STARTING, countdownInSeconds);
+
+	}
+
+	running(countdownInSeconds) {
+
+		this.fields.changeState(this.fields.STATE.RUNNING, countdownInSeconds);
 
 	}
 
@@ -341,7 +349,13 @@ class AppViewFields {
 
 		CONNECTING_DIV: '#connecting_div',
 		READY_DIV: '#ready_div',
+
+		STARTING_DIV: '#starting_div',
+		STARTING_TIME_SPAN: '#starting_time_span',
+		
 		RUNNING_DIV: '#running_div',
+		RUNNING_TIME_SPAN: '#running_time_span',
+
 		ENDED_DIV: '#ended_div',
 
 	};
@@ -372,9 +386,19 @@ class AppViewFields {
 
 		},
 
-		RUNNING: () => {
+		STARTING: (countdownInSeconds) => {
+
+			$(this.SELECTORS.STARTING_DIV).show();
+
+			if (countdownInSeconds) $(this.SELECTORS.STARTING_TIME_SPAN).text(countdownInSeconds);
+
+		},
+
+		RUNNING: (countdownInSeconds) => {
 
 			$(this.SELECTORS.RUNNING_DIV).show();
+
+			$(this.SELECTORS.RUNNING_TIME_SPAN).text(countdownInSeconds);
 
 		},
 
@@ -392,19 +416,19 @@ class AppViewFields {
 
 	}
 
-	changeState(newState) {
+	changeState(newState, params) {
 
 		this.state = newState;
 
-		this.render();
+		this.render(params);
 
 	}
 
-	render() {
+	render(params) {
 
 		$(this.SELECTORS.APP + ' > div').hide();
 
-		this.state();
+		this.state(params);
 
 	}
 
@@ -601,7 +625,7 @@ class AppState {
 
 		let timer = new AppTimer();
 
-		timer.setDurationInSeconds(this.duration);
+		timer.setDurationInSeconds(this.duration * 60);
 
 		timer.setStartTimestamp(contestStartTimestamp);
 
