@@ -109,6 +109,8 @@ class AppManager {
 
 		this.state = state;
 
+		this.state.setManager(this);
+
 		this.adapter = new AppAdapter();
 
 		this.adapter.setManager(this);
@@ -178,9 +180,21 @@ class AppManager {
 
 	}
 
-	contestStarted() {
+	contestEnterCountdown(contestStartTimestamp) {
 
-		this.view.running();
+		this.state.prepareTimer(contestStartTimestamp);
+
+	}
+
+	contestCountdown(countdownInSeconds) {
+
+		this.view.countdown(countdownInSeconds);
+
+	}
+
+	contestRunning(countdownInSeconds) {
+
+		this.view.running(countdownInSeconds);
 
 	}
 
@@ -433,6 +447,12 @@ class AppState {
 
 	}
 
+	setManager(manager) {
+
+		this.manager = manager;
+
+	}
+
 	clone() {
 
 		let cloned = new AppState();
@@ -577,6 +597,24 @@ class AppState {
 
 	}
 
+	prepareTimer(contestStartTimestamp) {
+
+		let timer = new AppTimer();
+
+		timer.setDurationInSeconds(this.duration);
+
+		timer.setStartTimestamp(contestStartTimestamp);
+
+		timer.setCallbackOnWaiting((toWaitSeconds) => { this.manager.contestCountdown(toWaitSeconds); });
+
+		timer.setCallbackOnTick((elapsedSeconds) => { this.manager.contestRunning(elapsedSeconds); });
+
+		timer.setCallbackOnEnd(() => { this.manager.contestEnded(); });
+
+		timer.start();
+
+	}
+
 }
 
 class AppTimer {
@@ -584,6 +622,8 @@ class AppTimer {
 	_STATES = {
 
 		SETUP: 'SETUP',
+
+		WAITING: 'WAITING',
 
 		RUNNING: 'RUNNING',
 
@@ -605,9 +645,15 @@ class AppTimer {
 
 	}
 
-	setStartTime(startTimeTimeStamp) {
+	setStartTimestamp(startTimestamp) {
 
-		this._durationInSeconds = Math.max(1, Math.floor((startTimeTimeStamp - new Date().getTime())) / 1000);
+		this._startTimestamp = startTimestamp;
+
+	}
+
+	setCallbackOnWaiting(callback) {
+
+		this._callbackOnWaiting = callback;
 
 	}
 
@@ -627,11 +673,31 @@ class AppTimer {
 
 		if (this._state != this._STATES.SETUP) return;
 
-		this._state = this._STATES.RUNNING;		
+		this._state = this._STATES.RUNNING;
+
+		if (this._startTimestamp && this._startTimestamp > (new Date().getTime())) {
+
+			this._state = this._STATES.WAITING;
+
+			this._toWaitSeconds = Math.floor((this._startTimestamp - new Date().getTime()) / 1000);
+
+		}
 
 		this._elapsedSeconds = 0;
 
 		this._intervalId = setInterval(() => {
+
+			if (this._state === this._STATES.WAITING) {
+
+				this._toWaitSeconds--;
+
+				this._waiting();
+
+				if (this._toWaitSeconds <= 0) this._state = this._STATES.RUNNING; 
+
+				return;
+			}
+
 
 			this._elapsedSeconds++;
 
@@ -643,6 +709,14 @@ class AppTimer {
 
 		}, 1000);
 
+	}
+
+	_waiting() {
+
+		console.log('Timer waiting', this._toWaitSeconds);
+
+		if (this._callbackOnWaiting) this._callbackOnWaiting(this._toWaitSeconds);
+		
 	}
 
 	_ticking() {
@@ -790,6 +864,12 @@ const NetworkResponseProcessor = {
 	getProblemId: function(socketResponse) {
 
 		return socketResponse.contestQuestionId;
+
+	},
+
+	getStartTime: function(socketResponse) {
+
+		return socketResponse.startedAt;
 
 	}
 
@@ -1012,7 +1092,7 @@ class AppAdapter {
 
 		console.log('receivedContestStart', socketMessage);
 		
-		this.manager.contestStarted();
+		this.manager.contestEnterCountdown(NetworkResponseProcessor.getStartTime(socketMessage));
 
 	}
 
