@@ -87,11 +87,15 @@ public class ContestService {
     public Contest joinContest(JoinContestRequest joinContestRequest) {
 
         var contestId = Long.parseLong(joinContestRequest.getSessionId());
+        var userId = joinContestRequest.getUserId();
 
-        ContestUsers contestUsers = new ContestUsers();
-        contestUsers.setContestId(contestId);
-        contestUsers.setUserId(joinContestRequest.getUserId());
-        contestUsersRepository.save(contestUsers);
+        ContestUsers contestUsers = contestUsersRepository.findByContestIdAndUserId(contestId, userId).orElse(null);
+        if (contestUsers == null) {
+            contestUsers = new ContestUsers();
+            contestUsers.setContestId(contestId);
+            contestUsers.setUserId(userId);
+            contestUsersRepository.save(contestUsers);
+        }
 
         var contestQuestionsList = contestQuestionsRepository.findByContestId(contestId);
         var contestUsersList = contestUsersRepository.findByContestId(contestId);
